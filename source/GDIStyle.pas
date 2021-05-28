@@ -3,11 +3,12 @@ unit GDIStyle;
 interface
 
 uses
-  Classes, Graphics, GDI;
+  Classes, Graphics, GDI, GDICtrls;
 
 type
   TGDIStyle = class(TPersistent)
   private
+    FControl: TCustomCtrl;
     FOnChange: TNotifyEvent;
     FColorEnd: TColor;
     FGradientMode: TGPLinearGradientMode;
@@ -18,9 +19,14 @@ type
     procedure SetGradientMode(const Value: TGPLinearGradientMode);
     procedure DoChange;
     procedure SetOpacity(const Value: Word);
+
+    function GPColorBegin: TGPColor;
+    function GPColorEnd: TGPColor;
   public
-    constructor Create;
+    constructor Create(AControl: TCustomCtrl);
     destructor Destroy; override;
+
+    function GradientBrush: IGPLinearGradientBrush;
 
     procedure Assign(Source: TPersistent); override;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -48,8 +54,9 @@ begin
     inherited;
 end;
 
-constructor TGDIStyle.Create;
+constructor TGDIStyle.Create(AControl: TCustomCtrl);
 begin
+  FControl := AControl;
   FOpacity := 255;
   FColorBegin := clGray;
   FColorEnd := clBtnFace;
@@ -65,6 +72,24 @@ procedure TGDIStyle.DoChange;
 begin
   if Assigned(FOnChange) then
     OnChange(Self);
+end;
+
+function TGDIStyle.GPColorBegin: TGPColor;
+begin
+  Result.InitializeFromColorRef(FColorBegin);
+  Result.Alpha := FOpacity;
+end;
+
+function TGDIStyle.GPColorEnd: TGPColor;
+begin
+  Result.InitializeFromColorRef(FColorEnd);
+  Result.Alpha := FOpacity;
+end;
+
+function TGDIStyle.GradientBrush: IGPLinearGradientBrush;
+begin
+  Result := TGPLinearGradientBrush.Create(
+    TGPRectF.Create(0, 0, FControl.ClientWidth, FControl.ClientHeight), GPColorBegin, GPColorEnd, FGradientMode);
 end;
 
 procedure TGDIStyle.SetColorBegin(const Value: TColor);

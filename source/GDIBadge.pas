@@ -47,10 +47,12 @@ type
     procedure SetAutoSize(const Value: Boolean);
     procedure SetIndentText(const Value: Integer);
   private
+    FOpacity: Word;
     function Control: TCustomCtrl;
     procedure DoChange(Sender: TObject);
     function CanChangeProp(const ACurrentValue, AValue: Integer): Boolean;
     procedure Paint(GPGraphics: IGPGraphics);
+    procedure SetOpacity(const Value: Word);
   protected
     Function GetDisplayName: String; Override;
   public
@@ -74,6 +76,7 @@ type
     property Height: Integer read FHeight write SetHeight default 0;
     property Width: Integer read FWidth write SetWidth default 0;
     property IndentText: Integer read FIndentText write SetIndentText default 0;
+    property Opacity: Word read FOpacity write SetOpacity default 200;
   end;
 
   TBadgeCollection = Class(TOwnedCollection)
@@ -142,6 +145,7 @@ begin
   FHeight := 0;
   FWidth := 0;
   FIndentText := 0;
+  FOpacity := 200;
   FFont := TFont.Create;
   FFont.OnChange := DoChange;
 end;
@@ -235,7 +239,7 @@ begin
   end;
 
   Colr := TGPColor.CreateFromColorRef(FColor);
-  Colr.Alpha := 200;
+  Colr.Alpha := FOpacity;
 
   FillX := CalcPieX;
   FillY := CalcPieY;
@@ -331,6 +335,15 @@ begin
   if FIndentText <> Value then
   begin
     FIndentText := Value;
+    DoChange(Self);
+  end;
+end;
+
+procedure TBadge.SetOpacity(const Value: Word);
+begin
+  if (FOpacity <> Value) and (Value in [0 .. 255]) then
+  begin
+    FOpacity := Value;
     DoChange(Self);
   end;
 end;

@@ -12,6 +12,7 @@ type
 
 function MakeColor(a, R, G, B: Byte): UInt32; overload;
 function MakeColor(a: Byte; Color: TColor): UInt32; overload;
+function ColorToGPColor(AColor: TColor): TGPColor;
 
 implementation
 
@@ -31,6 +32,11 @@ var
 begin
   RGB := ColorToRGB(Color);
   Result := MakeColor(a, (RGB and $FF), (RGB and $FF00) shr 8, (RGB and $FF0000) shr 16);
+end;
+
+function ColorToGPColor(AColor: TColor): TGPColor;
+begin
+  Result.InitializeFromColorRef(AColor);
 end;
 
 { TGPFontHelper }

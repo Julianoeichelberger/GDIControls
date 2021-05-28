@@ -44,7 +44,7 @@ type
     property Padding: Integer read FPadding write SetPadding default 0;
   end;
 
-  TGDICard = class(TCustomCtrl)
+  TGDICustomCard = class(TCustomCtrl)
   private
     FPicture: TPicture;
     FValidCache: Boolean;
@@ -54,6 +54,7 @@ type
     FBadges: TBadgeCollection;
     FTextBox: TTextBox;
     FData: Pointer;
+    FStyle: TGDIStyle;
     procedure Changed;
     procedure SetPicture(Value: TPicture);
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
@@ -67,6 +68,7 @@ type
     procedure DoChanged(Sender: TObject);
     procedure SetTextBox(const Value: TTextBox);
     procedure SetBadges(const Value: TBadgeCollection);
+    procedure SetStyle(const Value: TGDIStyle);
   protected
     procedure Paint; override;
     procedure Resize; override;
@@ -79,14 +81,19 @@ type
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
 
     property Constraints;
-
     property Data: Pointer read FData write FData;
+
+    property Badges: TBadgeCollection read FBadges write SetBadges;
+    property Picture: TPicture read FPicture write SetPicture;
+    property TextBox: TTextBox read FTextBox write SetTextBox;
+    property Style: TGDIStyle read FStyle write SetStyle;
+  end;
+
+  TGDICard = class(TGDICustomCard)
   published
     property Align;
     property Anchors;
-
-    property Badges: TBadgeCollection read FBadges write SetBadges;
-
+    property Badges;
     property DragCursor;
     property DragKind;
     property DragMode;
@@ -94,13 +101,12 @@ type
     property Font;
     property ParentFont;
     property ParentShowHint;
+    property Picture;
     property PopupMenu;
     property ShowHint;
+    property Style;
+    property TextBox;
     property Visible;
-
-    property Picture: TPicture read FPicture write SetPicture;
-
-    property TextBox: TTextBox read FTextBox write SetTextBox;
 
     property OnClick;
     property OnContextPopup;
@@ -171,13 +177,10 @@ var
   Rectf: TGPRectF;
   StringFormat: IGPStringFormat;
   Pointx: TGPPointF;
+
 begin
   if FText.IsEmpty then
     exit;
-
-  if not FParentColor then
-    GPSolidBrush :=
-      TGPSolidBrush.Create(TGPColor.Create(200, GetRValue(FColor), GetGValue(FColor), GetBValue(FColor)));
 
   FControl.Canvas.Font.Assign(FControl.Font);
 
@@ -187,6 +190,7 @@ begin
 
   if not FParentColor then
   begin
+    GPSolidBrush := TGPSolidBrush.Create(ColorToGPColor(FColor));
     GPGraphicsPath := TGPGraphicsPath.Create;
     GPGraphicsPath.Reset;
 
@@ -211,12 +215,9 @@ begin
           Rectf.Height + 10)
           );
     end;
-
     GPGraphicsPath.CloseFigure;
-
     GPGraphics.FillPath(GPSolidBrush, GPGraphicsPath);
   end;
-
   GPSolidBrush := TGPSolidBrush.Create(TGPColor.CreateFromColorRef(FFont.Color));
 
   StringFormat := TGPStringFormat.GenericDefault;
@@ -304,13 +305,13 @@ end;
 
 { TZSProductButton }
 
-procedure TGDICard.Changed;
+procedure TGDICustomCard.Changed;
 begin
   FValidCache := false;
   Invalidate;
 end;
 
-procedure TGDICard.CMDialogChar(var Message: TCMDialogChar);
+procedure TGDICustomCard.CMDialogChar(var Message: TCMDialogChar);
 begin
   with Message do
     if IsAccel(CharCode, Caption) and CanFocus then
@@ -326,33 +327,36 @@ begin
       inherited;
 end;
 
-procedure TGDICard.CMFontChanged(var Message: TMessage);
+procedure TGDICustomCard.CMFontChanged(var Message: TMessage);
 begin
   inherited;
   Changed;
 end;
 
-procedure TGDICard.CMMouseEnter(var Message: TMessage);
+procedure TGDICustomCard.CMMouseEnter(var Message: TMessage);
 begin
   inherited;
   Changed;
 end;
 
-procedure TGDICard.CMMouseLeave(var Message: TMessage);
+procedure TGDICustomCard.CMMouseLeave(var Message: TMessage);
 begin
   inherited;
   Changed;
 end;
 
-procedure TGDICard.CMTextChanged(var Message: TMessage);
+procedure TGDICustomCard.CMTextChanged(var Message: TMessage);
 begin
   inherited;
   Changed;
 end;
 
-constructor TGDICard.Create(AOwner: TComponent);
+constructor TGDICustomCard.Create(AOwner: TComponent);
 begin
   inherited;
+  FStyle := TGDIStyle.Create(Self);
+  FStyle.OnChange := DoChanged;
+
   FBadges := TBadgeCollection.Create(Self, TBadge);
   FBadges.OnChange := DoChanged;
 
@@ -375,15 +379,16 @@ begin
   FCache := TGPBitmap.Create(Width, Height, PixelFormat32bppARGB);
 end;
 
-destructor TGDICard.Destroy;
+destructor TGDICustomCard.Destroy;
 begin
   FreeAndNil(FPicture);
   FTextBox.Free;
   FBadges.Free;
+  FStyle.Free;
   inherited;
 end;
 
-procedure TGDICard.InvalidateCache;
+procedure TGDICustomCard.InvalidateCache;
 begin
   if not HandleAllocated then
     exit;
@@ -395,7 +400,7 @@ begin
   FValidCache := false;
 end;
 
-procedure TGDICard.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TGDICustomCard.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   SetBounds(Left + 1, Top + 1, Width - 2, Height - 2);
   FDown := True;
@@ -403,7 +408,7 @@ begin
   inherited MouseDown(Button, Shift, X, Y);
 end;
 
-procedure TGDICard.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TGDICustomCard.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   SetBounds(Left - 1, Top - 1, Width + 2, Height + 2);
   FDown := false;
@@ -411,7 +416,7 @@ begin
   inherited MouseUp(Button, Shift, X, Y);
 end;
 
-procedure TGDICard.Paint;
+procedure TGDICustomCard.Paint;
 
   procedure BeginPaint;
   var
@@ -447,39 +452,25 @@ var
   pcbWrite: Integer;
   GPGraphics: IGPGraphics;
   GPGraphicsPath: IGPGraphicsPath;
-  GPColor, GPColor2: TGPColor;
   ImageSize: TSize;
   Stream: TMemoryStream;
   Pstm: IStream;
   Hr: HRESULT;
   hGlobal: THandle;
   GPImage: IGPImage;
-  GradientBrush: IGPLinearGradientBrush;
 begin
   BeginPaint;
   if not FValidCache then
   begin
     GPGraphicsPath := TGPGraphicsPath.Create;
     GPGraphicsPath.Reset;
-
     GPGraphicsPath.AddRectangle(TGPRectF.Create(0, 0, ClientWidth, ClientHeight));
-
     GPGraphicsPath.CloseFigure;
-    GPColor.InitializeFromColorRef($00EEB711);
-    GPColor2.InitializeFromColorRef(clBlue);
-    GPColor2.Alpha := 50;
-
-    GradientBrush := TGPLinearGradientBrush.Create(
-      TGPRectF.Create(0, 0, ClientWidth, ClientHeight),
-      GPColor2, GPColor, TGPLinearGradientMode.LinearGradientModeHorizontal);
 
     GPGraphics := TGPGraphics.Create(FCache);
-
     GPGraphics.SmoothingMode := SmoothingModeAntiAlias;
     GPGraphics.TextRenderingHint := TextRenderingHintClearTypeGridFit;
-    // GPGraphics.Clear(clBlue);
-
-    GPGraphics.FillPath(GradientBrush, GPGraphicsPath);
+    GPGraphics.FillPath(FStyle.GradientBrush, GPGraphicsPath);
 
     if Picture.Graphic <> nil then
     begin
@@ -534,40 +525,45 @@ begin
   end;
 end;
 
-procedure TGDICard.DoChanged(Sender: TObject);
+procedure TGDICustomCard.DoChanged(Sender: TObject);
 begin
   Changed;
 end;
 
-procedure TGDICard.Resize;
+procedure TGDICustomCard.Resize;
 begin
   inherited;
   InvalidateCache;
 end;
 
-procedure TGDICard.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
+procedure TGDICustomCard.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
   inherited;
   InvalidateCache;
 end;
 
-procedure TGDICard.SetPicture(Value: TPicture);
+procedure TGDICustomCard.SetPicture(Value: TPicture);
 begin
   FPicture.Assign(Value);
   Changed;
 end;
 
-procedure TGDICard.SetBadges(const Value: TBadgeCollection);
+procedure TGDICustomCard.SetStyle(const Value: TGDIStyle);
+begin
+  FStyle.Assign(Value);
+end;
+
+procedure TGDICustomCard.SetBadges(const Value: TBadgeCollection);
 begin
   FBadges.Assign(Value);
 end;
 
-procedure TGDICard.SetTextBox(const Value: TTextBox);
+procedure TGDICustomCard.SetTextBox(const Value: TTextBox);
 begin
   FTextBox.Assign(Value)
 end;
 
-procedure TGDICard.WMGetDlgCode(var Message: TWMGetDlgCode);
+procedure TGDICustomCard.WMGetDlgCode(var Message: TWMGetDlgCode);
 begin
   if TabStop then
     Message.Result := DLGC_WANTALLKEYS or DLGC_WANTARROWS
@@ -575,7 +571,7 @@ begin
     Message.Result := 0;
 end;
 
-procedure TGDICard.WMPaint(var Message: TWMPaint);
+procedure TGDICustomCard.WMPaint(var Message: TWMPaint);
 var
   DC, MemDC: HDC;
   MemBitmap, OldBitmap: HBITMAP;

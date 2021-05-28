@@ -37,6 +37,7 @@ contains
   GDICtrls in 'source\GDICtrls.pas',
   GDIUtils in 'source\GDIUtils.pas',
   GDI in 'source\GDI.pas',
-  GDIReg in 'source\GDIReg.pas';
+  GDIReg in 'source\GDIReg.pas',
+  GDIStyle in 'source\GDIStyle.pas';
 
 end.
