@@ -5,7 +5,7 @@ interface
 
 uses
   Vcl.Controls, Vcl.Graphics, Winapi.Messages, Winapi.Windows, Vcl.Forms, System.Classes, System.SysUtils, System.Math,
-  Winapi.ActiveX, Gdi, GDICtrls, GDIBadge, GDIStyle;
+  Winapi.ActiveX, Gdi, GDICtrls, GDIBadge, GDIStyle, GDIImage;
 
 type
   TTextBoxAlign = (tbaBottom, tbaCenter, tbaTop);
@@ -20,6 +20,7 @@ type
     FOnChange: TNotifyEvent;
     FText: string;
     FPadding: Integer;
+    FOpacity: Word;
     procedure SetAlign(const Value: TTextBoxAlign);
     procedure SetColor(const Value: TColor);
     procedure SetFont(const Value: TFont);
@@ -29,6 +30,7 @@ type
     procedure SetOnChange(const Value: TNotifyEvent);
     procedure SetPadding(const Value: Integer);
     procedure Paint(GPGraphics: IGPGraphics);
+    procedure SetOpacity(const Value: Word);
   public
     constructor Create(AControl: TCustomCtrl);
     destructor Destroy; override;
@@ -42,11 +44,11 @@ type
     property ParentColor: Boolean read FParentColor write SetParentColor default True;
     property Text: string read FText write SetText;
     property Padding: Integer read FPadding write SetPadding default 0;
+    property Opacity: Word read FOpacity write SetOpacity default 200;
   end;
 
   TGDICustomCard = class(TCustomCtrl)
   private
-    FPicture: TPicture;
     FValidCache: Boolean;
     FCache: IGPBitmap;
     DisableCache: Boolean;
@@ -55,8 +57,8 @@ type
     FTextBox: TTextBox;
     FData: Pointer;
     FStyle: TGDIStyle;
+    FImage: TGDIImage;
     procedure Changed;
-    procedure SetPicture(Value: TPicture);
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
@@ -69,6 +71,7 @@ type
     procedure SetTextBox(const Value: TTextBox);
     procedure SetBadges(const Value: TBadgeCollection);
     procedure SetStyle(const Value: TGDIStyle);
+    procedure SetImage(const Value: TGDIImage);
   protected
     procedure Paint; override;
     procedure Resize; override;
@@ -84,9 +87,9 @@ type
     property Data: Pointer read FData write FData;
 
     property Badges: TBadgeCollection read FBadges write SetBadges;
-    property Picture: TPicture read FPicture write SetPicture;
     property TextBox: TTextBox read FTextBox write SetTextBox;
     property Style: TGDIStyle read FStyle write SetStyle;
+    property Image: TGDIImage read FImage write SetImage;
   end;
 
   TGDICard = class(TGDICustomCard)
@@ -98,10 +101,10 @@ type
     property DragKind;
     property DragMode;
     property Enabled;
+    property Image;
     property Font;
     property ParentFont;
     property ParentShowHint;
-    property Picture;
     property PopupMenu;
     property ShowHint;
     property Style;
@@ -142,6 +145,7 @@ begin
     Self.FAlign := TTextBox(Source).Align;
     Self.FPadding := TTextBox(Source).Padding;
     Self.FText := TTextBox(Source).Text;
+    Self.FOpacity := TTextBox(Source).Opacity;
   end
   else
     inherited;
@@ -154,6 +158,7 @@ begin
   FAlign := tbaBottom;
   FParentColor := True;
   FColor := clDefault;
+  FOpacity := 200;
   FPadding := 0;
 end;
 
@@ -177,20 +182,17 @@ var
   Rectf: TGPRectF;
   StringFormat: IGPStringFormat;
   Pointx: TGPPointF;
-
 begin
   if FText.IsEmpty then
     exit;
 
   FControl.Canvas.Font.Assign(FControl.Font);
-
   Fontx := TGPFont.CreateByFont(FControl.Canvas.Handle, FControl.Font);
-
   Rectf := GPGraphics.MeasureString(FText, Fontx, TGPRectF.Create(0, 0, FControl.Width, FControl.Height));
 
   if not FParentColor then
   begin
-    GPSolidBrush := TGPSolidBrush.Create(ColorToGPColor(FColor));
+    GPSolidBrush := TGPSolidBrush.Create(ColorToGPColor(FColor, FOpacity));
     GPGraphicsPath := TGPGraphicsPath.Create;
     GPGraphicsPath.Reset;
 
@@ -276,6 +278,15 @@ begin
   FFont.OnChange := Value;
 end;
 
+procedure TTextBox.SetOpacity(const Value: Word);
+begin
+  if (FOpacity <> Value) and (Value in [0 .. 255]) then
+  begin
+    FOpacity := Value;
+    DoChange;
+  end;
+end;
+
 procedure TTextBox.SetPadding(const Value: Integer);
 begin
   if FPadding <> Value then
@@ -354,6 +365,9 @@ end;
 constructor TGDICustomCard.Create(AOwner: TComponent);
 begin
   inherited;
+  FImage := TGDIImage.Create(Self);
+  FImage.OnChange := DoChanged;
+
   FStyle := TGDIStyle.Create(Self);
   FStyle.OnChange := DoChanged;
 
@@ -374,17 +388,18 @@ begin
   Font.Name := 'Arial';
   Font.Style := [fsBold];
   FDown := false;
-  FPicture := TPicture.Create;
-  FPicture.OnChange := DoChanged;
+  // FPicture := TPicture.Create;
+  // FPicture.OnChange := DoChanged;
   FCache := TGPBitmap.Create(Width, Height, PixelFormat32bppARGB);
 end;
 
 destructor TGDICustomCard.Destroy;
 begin
-  FreeAndNil(FPicture);
+  // FreeAndNil(FPicture);
   FTextBox.Free;
   FBadges.Free;
   FStyle.Free;
+  FImage.Free;
   inherited;
 end;
 
@@ -449,22 +464,27 @@ procedure TGDICustomCard.Paint;
   end;
 
 var
-  pcbWrite: Integer;
+//  pcbWrite: Integer;
   GPGraphics: IGPGraphics;
   GPGraphicsPath: IGPGraphicsPath;
-  ImageSize: TSize;
-  Stream: TMemoryStream;
-  Pstm: IStream;
-  Hr: HRESULT;
-  hGlobal: THandle;
-  GPImage: IGPImage;
+//  ImageSize: TSize;
+//  Stream: TMemoryStream;
+//  Pstm: IStream;
+//  Hr: HRESULT;
+//  hGlobal: THandle;
+//  GPImage: IGPImage;
 begin
   BeginPaint;
   if not FValidCache then
   begin
     GPGraphicsPath := TGPGraphicsPath.Create;
     GPGraphicsPath.Reset;
-    GPGraphicsPath.AddRectangle(TGPRectF.Create(0, 0, ClientWidth, ClientHeight));
+
+    GPGraphicsPath.AddArc(3, 3, FStyle.Angle, FStyle.Angle, 180, 90);
+    GPGraphicsPath.AddArc(ClientWidth - FStyle.Angle - 4, 3, FStyle.Angle, FStyle.Angle, 270, 90);
+    GPGraphicsPath.AddArc(ClientWidth - FStyle.Angle - 4, ClientHeight - FStyle.Angle - 4, FStyle.Angle, FStyle.Angle, 0, 90);
+    GPGraphicsPath.AddArc(3, ClientHeight - FStyle.Angle - 4, FStyle.Angle, FStyle.Angle, 90, 90);
+
     GPGraphicsPath.CloseFigure;
 
     GPGraphics := TGPGraphics.Create(FCache);
@@ -472,45 +492,46 @@ begin
     GPGraphics.TextRenderingHint := TextRenderingHintClearTypeGridFit;
     GPGraphics.FillPath(FStyle.GradientBrush, GPGraphicsPath);
 
-    if Picture.Graphic <> nil then
-    begin
+    FImage.Draw(GPGraphics);
 
-      ImageSize.Width := Picture.Width;
-      ImageSize.Height := Picture.Height;
-      ImageSize.Width := Width;
-      ImageSize.Height := Height;
-
-      Stream := TMemoryStream.Create;
-      Picture.Graphic.SaveToStream(Stream);
-      Stream.Seek(0, soFromBeginning);
-
-      hGlobal := GlobalAlloc(GMEM_MOVEABLE, Stream.Size);
-
-      Pstm := nil;
-
-      Hr := CreateStreamOnHGlobal(hGlobal, True, Pstm);
-
-      if (Hr = S_OK) then
-      begin
-        pcbWrite := 0;
-        Pstm.Write(Stream.Memory, Stream.Size, @pcbWrite);
-
-        if (Stream.Size = pcbWrite) then
-        begin
-          GPImage := TGPImage.FromStream(Pstm);
-
-          GPGraphics.InterpolationMode := InterpolationModeHighQuality;
-
-          GPGraphics.DrawImage(GPImage, ((Width) / 2) - (ImageSize.Width / 2), ((Height) / 2) - (ImageSize.Height / 2),
-            ImageSize.Width, ImageSize.Height);
-        end;
-        Pstm := nil;
-      end
-      else
-        GlobalFree(hGlobal);
-
-      Stream.Free;
-    end;
+    // if Picture.Graphic <> nil then
+    // begin
+    // ImageSize.Width := Picture.Width;
+    // ImageSize.Height := Picture.Height;
+    // ImageSize.Width := Width;
+    // ImageSize.Height := Height;
+    //
+    // Stream := TMemoryStream.Create;
+    // Picture.Graphic.SaveToStream(Stream);
+    // Stream.Seek(0, soFromBeginning);
+    //
+    // hGlobal := GlobalAlloc(GMEM_MOVEABLE, Stream.Size);
+    //
+    // Pstm := nil;
+    //
+    // Hr := CreateStreamOnHGlobal(hGlobal, True, Pstm);
+    //
+    // if (Hr = S_OK) then
+    // begin
+    // pcbWrite := 0;
+    // Pstm.Write(Stream.Memory, Stream.Size, @pcbWrite);
+    //
+    // if (Stream.Size = pcbWrite) then
+    // begin
+    // GPImage := TGPImage.FromStream(Pstm);
+    //
+    // GPGraphics.InterpolationMode := InterpolationModeHighQuality;
+    //
+    // GPGraphics.DrawImage(GPImage, ((Width) / 2) - (ImageSize.Width / 2), ((Height) / 2) - (ImageSize.Height / 2),
+    // ImageSize.Width, ImageSize.Height);
+    // end;
+    // Pstm := nil;
+    // end
+    // else
+    // GlobalFree(hGlobal);
+    //
+    // Stream.Free;
+    // end;
 
     FBadges.Paint(GPGraphics);
     FTextBox.Paint(GPGraphics);
@@ -542,9 +563,9 @@ begin
   InvalidateCache;
 end;
 
-procedure TGDICustomCard.SetPicture(Value: TPicture);
+procedure TGDICustomCard.SetImage(const Value: TGDIImage);
 begin
-  FPicture.Assign(Value);
+  FImage.Assign(Value);
   Changed;
 end;
 
