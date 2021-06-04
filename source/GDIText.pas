@@ -119,10 +119,7 @@ begin
   StringFormat.Alignment := TGPStringAlignment(FAlignment);
 
   GdiFont := FFont.toGPFont(Control.Canvas.Handle);
-  {
-    function MeasureString(const Str: String; const Font: IGPFont;
-    const LayoutRectSize: TGPSizeF; const Format: IGPStringFormat): TGPSizeF; overload;
-  }
+
   Sizef := GPGraphics.MeasureString(FValue, GdiFont, TGPSizeF.Create(0, 0), StringFormat);
 
   GPGraphics.DrawString(FValue, GdiFont, Control.GetPoint(FAlign, Sizef.Height, Sizef.Width, FPadding), StringFormat,

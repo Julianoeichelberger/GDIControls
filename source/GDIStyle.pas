@@ -6,22 +6,22 @@ uses
   Classes, Graphics, GDI, GDICtrls;
 
 type
+  TGDIGradientMode = (gmHorizontal, gmVertical, gmForwardDiagonal, gmBackwardDiagonal);
+
   TGDIStyle = class(TGDIPersistent)
   private
     FControl: TCustomCtrl;
     FColorEnd: TColor;
-    FGradientMode: TGPLinearGradientMode;
+    FGradientMode: TGDIGradientMode;
     FColorBegin: TColor;
     FOpacity: Word;
     FAngle: Word;
     procedure SetColorBegin(const Value: TColor);
     procedure SetColorEnd(const Value: TColor);
-    procedure SetGradientMode(const Value: TGPLinearGradientMode);
+    procedure SetGradientMode(const Value: TGDIGradientMode);
     procedure SetOpacity(const Value: Word);
     procedure SetAngle(const Value: Word);
   private
-    function GPColorBegin: TGPColor;
-    function GPColorEnd: TGPColor;
     function GradientBrush: IGPLinearGradientBrush;
   public
     constructor Create(AControl: TCustomCtrl);
@@ -33,13 +33,15 @@ type
     property Angle: Word read FAngle write SetAngle default 10;
     property ColorBegin: TColor read FColorBegin write SetColorBegin default clGray;
     property ColorEnd: TColor read FColorEnd write SetColorEnd default clBtnFace;
-    property GradientMode: TGPLinearGradientMode read FGradientMode write SetGradientMode default LinearGradientModeHorizontal;
+    property GradientMode: TGDIGradientMode read FGradientMode write SetGradientMode default gmHorizontal;
     property Opacity: Word read FOpacity write SetOpacity default 255;
   end;
 
 implementation
 
 { TGDIStyle }
+
+uses GDIUtils;
 
 procedure TGDIStyle.Assign(Source: TPersistent);
 begin
@@ -62,7 +64,7 @@ begin
   FOpacity := 255;
   FColorBegin := clGray;
   FColorEnd := clBtnFace;
-  FGradientMode := LinearGradientModeHorizontal;
+  FGradientMode := gmHorizontal;
 end;
 
 destructor TGDIStyle.Destroy;
@@ -88,22 +90,12 @@ begin
   GPGraphics.FillPath(GradientBrush, GPGraphicsPath);
 end;
 
-function TGDIStyle.GPColorBegin: TGPColor;
-begin
-  Result.InitializeFromColorRef(FColorBegin);
-  Result.Alpha := FOpacity;
-end;
-
-function TGDIStyle.GPColorEnd: TGPColor;
-begin
-  Result.InitializeFromColorRef(FColorEnd);
-  Result.Alpha := FOpacity;
-end;
-
 function TGDIStyle.GradientBrush: IGPLinearGradientBrush;
 begin
   Result := TGPLinearGradientBrush.Create(
-    TGPRectF.Create(0, 0, FControl.ClientWidth, FControl.ClientHeight), GPColorBegin, GPColorEnd, FGradientMode);
+    TGPRectF.Create(0, 0, FControl.ClientWidth, FControl.ClientHeight),
+    ColorToGPColor(FColorBegin, FOpacity), ColorToGPColor(FColorEnd, FOpacity),
+    TGPLinearGradientMode(FGradientMode));
 end;
 
 procedure TGDIStyle.SetAngle(const Value: Word);
@@ -133,7 +125,7 @@ begin
   end;
 end;
 
-procedure TGDIStyle.SetGradientMode(const Value: TGPLinearGradientMode);
+procedure TGDIStyle.SetGradientMode(const Value: TGDIGradientMode);
 begin
   if FGradientMode <> Value then
   begin
