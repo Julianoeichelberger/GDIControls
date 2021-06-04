@@ -105,6 +105,9 @@
         <DCCReference Include="source\GDI.pas"/>
         <DCCReference Include="source\GDIReg.pas"/>
         <DCCReference Include="source\GDIStyle.pas"/>
+        <DCCReference Include="source\GDIImage.pas"/>
+        <DCCReference Include="source\GDIText.pas"/>
+        <DCCReference Include="source\GDITextBox.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -38,6 +38,9 @@ contains
   GDIUtils in 'source\GDIUtils.pas',
   GDI in 'source\GDI.pas',
   GDIReg in 'source\GDIReg.pas',
-  GDIStyle in 'source\GDIStyle.pas';
+  GDIStyle in 'source\GDIStyle.pas',
+  GDIImage in 'source\GDIImage.pas',
+  GDIText in 'source\GDIText.pas',
+  GDITextBox in 'source\GDITextBox.pas';
 
 end.

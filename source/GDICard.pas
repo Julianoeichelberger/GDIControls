@@ -5,48 +5,9 @@ interface
 
 uses
   Vcl.Controls, Vcl.Graphics, Winapi.Messages, Winapi.Windows, Vcl.Forms, System.Classes, System.SysUtils, System.Math,
-  Winapi.ActiveX, Gdi, GDICtrls, GDIBadge, GDIStyle, GDIImage;
+  Winapi.ActiveX, Gdi, GDICtrls, GDIBadge, GDIStyle, GDIImage, GDIText, GDITextBox;
 
 type
-  TTextBoxAlign = (tbaBottom, tbaCenter, tbaTop);
-
-  TTextBox = class(TPersistent)
-  private
-    FControl: TCustomCtrl;
-    FAlign: TTextBoxAlign;
-    FColor: TColor;
-    FFont: TFont;
-    FParentColor: Boolean;
-    FOnChange: TNotifyEvent;
-    FText: string;
-    FPadding: Integer;
-    FOpacity: Word;
-    procedure SetAlign(const Value: TTextBoxAlign);
-    procedure SetColor(const Value: TColor);
-    procedure SetFont(const Value: TFont);
-    procedure SetParentColor(const Value: Boolean);
-    procedure SetText(const Value: string);
-    procedure DoChange;
-    procedure SetOnChange(const Value: TNotifyEvent);
-    procedure SetPadding(const Value: Integer);
-    procedure Paint(GPGraphics: IGPGraphics);
-    procedure SetOpacity(const Value: Word);
-  public
-    constructor Create(AControl: TCustomCtrl);
-    destructor Destroy; override;
-
-    procedure Assign(Source: TPersistent); override;
-    property OnChange: TNotifyEvent read FOnChange write SetOnChange;
-  published
-    property Align: TTextBoxAlign read FAlign write SetAlign default tbaBottom;
-    property Color: TColor read FColor write SetColor default clDefault;
-    property Font: TFont read FFont write SetFont;
-    property ParentColor: Boolean read FParentColor write SetParentColor default True;
-    property Text: string read FText write SetText;
-    property Padding: Integer read FPadding write SetPadding default 0;
-    property Opacity: Word read FOpacity write SetOpacity default 200;
-  end;
-
   TGDICustomCard = class(TCustomCtrl)
   private
     FValidCache: Boolean;
@@ -54,10 +15,11 @@ type
     DisableCache: Boolean;
     FDown: Boolean;
     FBadges: TBadgeCollection;
-    FTextBox: TTextBox;
+    FTextBox: TGDITextBox;
     FData: Pointer;
     FStyle: TGDIStyle;
     FImage: TGDIImage;
+    FTexts: TGDITextCollection;
     procedure Changed;
     procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
     procedure CMTextChanged(var Message: TMessage); message CM_TEXTCHANGED;
@@ -68,10 +30,11 @@ type
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure InvalidateCache;
     procedure DoChanged(Sender: TObject);
-    procedure SetTextBox(const Value: TTextBox);
+    procedure SetTextBox(const Value: TGDITextBox);
     procedure SetBadges(const Value: TBadgeCollection);
     procedure SetStyle(const Value: TGDIStyle);
     procedure SetImage(const Value: TGDIImage);
+    procedure SetTexts(const Value: TGDITextCollection);
   protected
     procedure Paint; override;
     procedure Resize; override;
@@ -87,9 +50,10 @@ type
     property Data: Pointer read FData write FData;
 
     property Badges: TBadgeCollection read FBadges write SetBadges;
-    property TextBox: TTextBox read FTextBox write SetTextBox;
-    property Style: TGDIStyle read FStyle write SetStyle;
     property Image: TGDIImage read FImage write SetImage;
+    property Style: TGDIStyle read FStyle write SetStyle;
+    property TextBox: TGDITextBox read FTextBox write SetTextBox;
+    property Texts: TGDITextCollection read FTexts write SetTexts;
   end;
 
   TGDICard = class(TGDICustomCard)
@@ -102,13 +66,12 @@ type
     property DragMode;
     property Enabled;
     property Image;
-    property Font;
-    property ParentFont;
     property ParentShowHint;
     property PopupMenu;
     property ShowHint;
     property Style;
     property TextBox;
+    property Texts;
     property Visible;
 
     property OnClick;
@@ -134,187 +97,7 @@ implementation
 uses
   GDIUtils;
 
-{ TTextBox }
-
-procedure TTextBox.Assign(Source: TPersistent);
-begin
-  if Source is TTextBox then
-  begin
-    Self.FColor := TTextBox(Source).Color;
-    Self.FParentColor := TTextBox(Source).ParentColor;
-    Self.FAlign := TTextBox(Source).Align;
-    Self.FPadding := TTextBox(Source).Padding;
-    Self.FText := TTextBox(Source).Text;
-    Self.FOpacity := TTextBox(Source).Opacity;
-  end
-  else
-    inherited;
-end;
-
-constructor TTextBox.Create(AControl: TCustomCtrl);
-begin
-  FControl := AControl;
-  FFont := TFont.Create;
-  FAlign := tbaBottom;
-  FParentColor := True;
-  FColor := clDefault;
-  FOpacity := 200;
-  FPadding := 0;
-end;
-
-destructor TTextBox.Destroy;
-begin
-  FFont.Free;
-  inherited;
-end;
-
-procedure TTextBox.DoChange;
-begin
-  if Assigned(FOnChange) then
-    OnChange(Self);
-end;
-
-procedure TTextBox.Paint(GPGraphics: IGPGraphics);
-var
-  GPGraphicsPath: IGPGraphicsPath;
-  Fontx: IGPFont;
-  GPSolidBrush: IGPSolidBrush;
-  Rectf: TGPRectF;
-  StringFormat: IGPStringFormat;
-  Pointx: TGPPointF;
-begin
-  if FText.IsEmpty then
-    exit;
-
-  FControl.Canvas.Font.Assign(FControl.Font);
-  Fontx := TGPFont.CreateByFont(FControl.Canvas.Handle, FControl.Font);
-  Rectf := GPGraphics.MeasureString(FText, Fontx, TGPRectF.Create(0, 0, FControl.Width, FControl.Height));
-
-  if not FParentColor then
-  begin
-    GPSolidBrush := TGPSolidBrush.Create(ColorToGPColor(FColor, FOpacity));
-    GPGraphicsPath := TGPGraphicsPath.Create;
-    GPGraphicsPath.Reset;
-
-    case FAlign of
-      tbaBottom:
-        GPGraphicsPath.AddRectangle(TGPRectF.Create(
-          FPadding,
-          FControl.ClientHeight - (Rectf.Height + 10),
-          FControl.ClientWidth - (FPadding * 2),
-          Rectf.Height + 10)
-          );
-      tbaCenter:
-        GPGraphicsPath.AddRectangle(TGPRectF.Create(FPadding,
-          (FControl.ClientHeight / 2) - ((Rectf.Height + 10) / 2),
-          FControl.ClientWidth - (FPadding * 2),
-          Rectf.Height + 10)
-          );
-      tbaTop:
-        GPGraphicsPath.AddRectangle(TGPRectF.Create(FPadding,
-          0,
-          FControl.ClientWidth - (FPadding * 2),
-          Rectf.Height + 10)
-          );
-    end;
-    GPGraphicsPath.CloseFigure;
-    GPGraphics.FillPath(GPSolidBrush, GPGraphicsPath);
-  end;
-  GPSolidBrush := TGPSolidBrush.Create(TGPColor.CreateFromColorRef(FFont.Color));
-
-  StringFormat := TGPStringFormat.GenericDefault;
-  StringFormat.Alignment := StringAlignmentCenter;
-  StringFormat.Trimming := StringTrimmingEllipsisPath;
-
-  case FAlign of
-    tbaBottom:
-      GPGraphics.DrawString(FText, Fontx,
-        TGPRectF.Create(TGPPointF.Create(0, (FControl.ClientHeight - (Rectf.Height + 5))),
-        TGPSizeF.Create(FControl.ClientWidth, FControl.ClientHeight - (FControl.ClientHeight - (Rectf.Height + 5)))),
-        StringFormat, GPSolidBrush);
-    tbaCenter:
-      begin
-        Pointx.X := 0;
-        Pointx.Y := ((FControl.Height) / 2) - (Rectf.Height / 2);
-        GPGraphics.DrawString(FText, Fontx, TGPRectF.Create(Pointx, TGPSizeF.Create(FControl.ClientWidth,
-          FControl.ClientHeight - Pointx.Y)), StringFormat, GPSolidBrush);
-      end;
-    tbaTop:
-      begin
-        GPGraphics.DrawString(FText, Fontx,
-          TGPRectF.Create(TGPPointF.Create(0, 5),
-          TGPSizeF.Create(FControl.ClientWidth, FControl.ClientHeight - (FControl.ClientHeight - (Rectf.Height + 5)))),
-          StringFormat, GPSolidBrush);
-      end;
-  end;
-end;
-
-procedure TTextBox.SetAlign(const Value: TTextBoxAlign);
-begin
-  if FAlign <> Value then
-  begin
-    FAlign := Value;
-    DoChange;
-  end;
-end;
-
-procedure TTextBox.SetColor(const Value: TColor);
-begin
-  if FColor <> Value then
-  begin
-    FColor := Value;
-    DoChange;
-  end;
-end;
-
-procedure TTextBox.SetFont(const Value: TFont);
-begin
-  FFont.Assign(Value);
-end;
-
-procedure TTextBox.SetOnChange(const Value: TNotifyEvent);
-begin
-  FOnChange := Value;
-  FFont.OnChange := Value;
-end;
-
-procedure TTextBox.SetOpacity(const Value: Word);
-begin
-  if (FOpacity <> Value) and (Value in [0 .. 255]) then
-  begin
-    FOpacity := Value;
-    DoChange;
-  end;
-end;
-
-procedure TTextBox.SetPadding(const Value: Integer);
-begin
-  if FPadding <> Value then
-  begin
-    FPadding := Value;
-    DoChange;
-  end;
-end;
-
-procedure TTextBox.SetParentColor(const Value: Boolean);
-begin
-  if FParentColor <> Value then
-  begin
-    FParentColor := Value;
-    DoChange;
-  end;
-end;
-
-procedure TTextBox.SetText(const Value: string);
-begin
-  if FText <> Value then
-  begin
-    FText := Value;
-    DoChange;
-  end;
-end;
-
-{ TZSProductButton }
+{ TGDICustomCard }
 
 procedure TGDICustomCard.Changed;
 begin
@@ -374,8 +157,11 @@ begin
   FBadges := TBadgeCollection.Create(Self, TBadge);
   FBadges.OnChange := DoChanged;
 
-  FTextBox := TTextBox.Create(Self);
+  FTextBox := TGDITextBox.Create(Self);
   FTextBox.OnChange := DoChanged;
+
+  FTexts := TGDITextCollection.Create(Self, TGDIText);
+  FTexts.OnChange := DoChanged;
 
   DoubleBuffered := True;
   Constraints.MinHeight := 1;
@@ -388,18 +174,16 @@ begin
   Font.Name := 'Arial';
   Font.Style := [fsBold];
   FDown := false;
-  // FPicture := TPicture.Create;
-  // FPicture.OnChange := DoChanged;
   FCache := TGPBitmap.Create(Width, Height, PixelFormat32bppARGB);
 end;
 
 destructor TGDICustomCard.Destroy;
 begin
-  // FreeAndNil(FPicture);
   FTextBox.Free;
   FBadges.Free;
   FStyle.Free;
   FImage.Free;
+  FTexts.Free;
   inherited;
 end;
 
@@ -464,77 +248,18 @@ procedure TGDICustomCard.Paint;
   end;
 
 var
-//  pcbWrite: Integer;
   GPGraphics: IGPGraphics;
-  GPGraphicsPath: IGPGraphicsPath;
-//  ImageSize: TSize;
-//  Stream: TMemoryStream;
-//  Pstm: IStream;
-//  Hr: HRESULT;
-//  hGlobal: THandle;
-//  GPImage: IGPImage;
 begin
   BeginPaint;
   if not FValidCache then
   begin
-    GPGraphicsPath := TGPGraphicsPath.Create;
-    GPGraphicsPath.Reset;
-
-    GPGraphicsPath.AddArc(3, 3, FStyle.Angle, FStyle.Angle, 180, 90);
-    GPGraphicsPath.AddArc(ClientWidth - FStyle.Angle - 4, 3, FStyle.Angle, FStyle.Angle, 270, 90);
-    GPGraphicsPath.AddArc(ClientWidth - FStyle.Angle - 4, ClientHeight - FStyle.Angle - 4, FStyle.Angle, FStyle.Angle, 0, 90);
-    GPGraphicsPath.AddArc(3, ClientHeight - FStyle.Angle - 4, FStyle.Angle, FStyle.Angle, 90, 90);
-
-    GPGraphicsPath.CloseFigure;
-
     GPGraphics := TGPGraphics.Create(FCache);
-    GPGraphics.SmoothingMode := SmoothingModeAntiAlias;
-    GPGraphics.TextRenderingHint := TextRenderingHintClearTypeGridFit;
-    GPGraphics.FillPath(FStyle.GradientBrush, GPGraphicsPath);
 
+    FStyle.Draw(GPGraphics);
     FImage.Draw(GPGraphics);
-
-    // if Picture.Graphic <> nil then
-    // begin
-    // ImageSize.Width := Picture.Width;
-    // ImageSize.Height := Picture.Height;
-    // ImageSize.Width := Width;
-    // ImageSize.Height := Height;
-    //
-    // Stream := TMemoryStream.Create;
-    // Picture.Graphic.SaveToStream(Stream);
-    // Stream.Seek(0, soFromBeginning);
-    //
-    // hGlobal := GlobalAlloc(GMEM_MOVEABLE, Stream.Size);
-    //
-    // Pstm := nil;
-    //
-    // Hr := CreateStreamOnHGlobal(hGlobal, True, Pstm);
-    //
-    // if (Hr = S_OK) then
-    // begin
-    // pcbWrite := 0;
-    // Pstm.Write(Stream.Memory, Stream.Size, @pcbWrite);
-    //
-    // if (Stream.Size = pcbWrite) then
-    // begin
-    // GPImage := TGPImage.FromStream(Pstm);
-    //
-    // GPGraphics.InterpolationMode := InterpolationModeHighQuality;
-    //
-    // GPGraphics.DrawImage(GPImage, ((Width) / 2) - (ImageSize.Width / 2), ((Height) / 2) - (ImageSize.Height / 2),
-    // ImageSize.Width, ImageSize.Height);
-    // end;
-    // Pstm := nil;
-    // end
-    // else
-    // GlobalFree(hGlobal);
-    //
-    // Stream.Free;
-    // end;
-
-    FBadges.Paint(GPGraphics);
-    FTextBox.Paint(GPGraphics);
+    FBadges.Draw(GPGraphics);
+    FTextBox.Draw(GPGraphics);
+    FTexts.Draw(GPGraphics);
 
     FValidCache := True;
   end;
@@ -579,9 +304,14 @@ begin
   FBadges.Assign(Value);
 end;
 
-procedure TGDICustomCard.SetTextBox(const Value: TTextBox);
+procedure TGDICustomCard.SetTextBox(const Value: TGDITextBox);
 begin
   FTextBox.Assign(Value)
+end;
+
+procedure TGDICustomCard.SetTexts(const Value: TGDITextCollection);
+begin
+  FTexts.Assign(Value);
 end;
 
 procedure TGDICustomCard.WMGetDlgCode(var Message: TWMGetDlgCode);

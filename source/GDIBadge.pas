@@ -18,10 +18,11 @@ type
 
   TOnCustomDrawBadge = procedure(Index: Integer; AGPGraphics: IGPGraphics) of object;
 
-  TBadge = Class(TCollectionItem)
+  TBadge = Class(TGDICollectionItem)
   private const
     MIN_LEN = 23;
   private
+    FOpacity: Word;
     FText: string;
     FAlign: TBadgeAlign;
     FColor: TColor;
@@ -46,15 +47,12 @@ type
     procedure SetFont(const Value: TFont);
     procedure SetAutoSize(const Value: Boolean);
     procedure SetIndentText(const Value: Integer);
-  private
-    FOpacity: Word;
-    function Control: TCustomCtrl;
-    procedure DoChange(Sender: TObject);
-    function CanChangeProp(const ACurrentValue, AValue: Integer): Boolean;
-    procedure Paint(GPGraphics: IGPGraphics);
     procedure SetOpacity(const Value: Word);
+  private
+    function CanChangeProp(const ACurrentValue, AValue: Integer): Boolean;
   protected
     Function GetDisplayName: String; Override;
+    procedure Draw(GPGraphics: IGPGraphics); Override;
   public
     constructor Create(Collection: TCollection); override;
     destructor Destroy; override;
@@ -79,21 +77,13 @@ type
     property Opacity: Word read FOpacity write SetOpacity default 200;
   end;
 
-  TBadgeCollection = Class(TOwnedCollection)
+  TBadgeCollection = Class(TGDICollection)
   private
-    FOnChange: TNotifyEvent;
     Function GetItems(Index: Integer): TBadge;
     Procedure SetItems(Index: Integer; Const Value: TBadge);
-  protected
-    procedure Notify(Item: TCollectionItem; Action: TCollectionNotification); override;
   public
-    function Control: TCustomCtrl;
     function Add: TBadge;
 
-    procedure Paint(GPGraphics: IGPGraphics);
-    procedure DoChangeAll;
-
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
     Property Items[Index: Integer]: TBadge Read GetItems Write SetItems;
   end;
 
@@ -128,11 +118,6 @@ begin
     ((FAutoSize and (AValue = 0)) or (not FAutoSize and (AValue > 0)));
 end;
 
-function TBadge.Control: TCustomCtrl;
-begin
-  Result := TBadgeCollection(Collection).Control;
-end;
-
 constructor TBadge.Create(Collection: TCollection);
 begin
   inherited;
@@ -156,13 +141,7 @@ begin
   inherited;
 end;
 
-procedure TBadge.DoChange(Sender: TObject);
-begin
-  if Assigned(TBadgeCollection(Collection).FOnChange) then
-    TBadgeCollection(Collection).OnChange(Sender);
-end;
-
-procedure TBadge.Paint(GPGraphics: IGPGraphics);
+procedure TBadge.Draw(GPGraphics: IGPGraphics);
 var
   TextRectF: TGPRectF;
   GdiFont: IGPFont;
@@ -226,9 +205,12 @@ var
   end;
 
 begin
-  GdiFont := TGPFont.CreateByFont(Control.Canvas.Handle, FFont);
+  if not Visible then
+    exit;
+  GdiFont := FFont.toGPFont(Control.Canvas.Handle);
 
-  TextRectF := GPGraphics.MeasureString(FText, GdiFont, TGPRectF.Create(0, 0, Control.Width, Control.Height));
+  TextRectF := GPGraphics.MeasureString(FText, GdiFont,
+    TGPRectF.Create(0, 0, Control.Width, Control.Height));
 
   BadgeW := FWidth;
   BadgeH := FHeight;
@@ -402,39 +384,9 @@ begin
   Result := TBadge(Inherited Add);
 end;
 
-function TBadgeCollection.Control: TCustomCtrl;
-begin
-  Result := TCustomCtrl(GetOwner);
-end;
-
-procedure TBadgeCollection.DoChangeAll;
-var
-  I: Integer;
-begin
-  for I := 0 to Pred(Self.Count) do
-    if Self.Items[I].Visible then
-      Self.Items[I].DoChange(Self.Items[I]);
-end;
-
 function TBadgeCollection.GetItems(Index: Integer): TBadge;
 begin
   Result := TBadge(Inherited GetItem(Index));
-end;
-
-procedure TBadgeCollection.Notify(Item: TCollectionItem; Action: TCollectionNotification);
-begin
-  inherited;
-  if Action = cnDeleting then
-    DoChangeAll;
-end;
-
-procedure TBadgeCollection.Paint(GPGraphics: IGPGraphics);
-var
-  I: Integer;
-begin
-  for I := 0 to Pred(Self.Count) do
-    if Self.Items[I].Visible then
-      Self.Items[I].Paint(GPGraphics);
 end;
 
 procedure TBadgeCollection.SetItems(Index: Integer; const Value: TBadge);

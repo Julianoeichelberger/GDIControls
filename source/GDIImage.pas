@@ -12,30 +12,23 @@ type
   TInterpolationMode = (imDefault, imLowQuality, imHighQuality, imBilinear,
     imBicubic, imNearestNeighbor, imHighQualityBilinear, imHighQualityBicubic);
 
-  TImagePosition = (
-    ipCenter, ipCenterLeft, ipCenterRight,
-    ipTop, ipTopLeft, ipTopRight,
-    ipBotton, ipBottonLeft, ipBottonRight);
-
-  TGDIImage = class(TPersistent)
+  TGDIImage = class(TGDIPersistent)
   private
     FControl: TCustomCtrl;
     FPicture: TPicture;
     FInterpolation: TInterpolationMode;
     FDrawMode: TDrawMode;
-    FOnChange: TNotifyEvent;
     FPadding: Integer;
     FWidth: Integer;
     FHeight: Integer;
-    FPosition: TImagePosition;
+    FPosition: TGDIAlign;
     procedure SetPicture(const Value: TPicture);
     procedure SetInterpolation(const Value: TInterpolationMode);
     procedure SetDrawMode(const Value: TDrawMode);
     procedure SePadding(const Value: Integer);
-    procedure DoChange;
     procedure SetHeight(const Value: Integer);
     procedure SetWidth(const Value: Integer);
-    procedure SetPosition(const Value: TImagePosition);
+    procedure SetPosition(const Value: TGDIAlign);
   protected
     procedure DrawStretchImage(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
     procedure DrawSquareImage(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
@@ -45,9 +38,7 @@ type
 
     procedure Assign(Source: TPersistent); override;
 
-    procedure Draw(AGPGraphics: IGPGraphics);
-
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    procedure Draw(AGPGraphics: IGPGraphics); override;
   published
     property DrawMode: TDrawMode read FDrawMode write SetDrawMode default dmStretch;
     property Interpolation: TInterpolationMode read FInterpolation write SetInterpolation default imDefault;
@@ -55,7 +46,7 @@ type
     property Padding: Integer read FPadding write SePadding default 0;
     property Height: Integer read FHeight write SetHeight default 0;
     property Width: Integer read FWidth write SetWidth default 0;
-    property Position: TImagePosition read FPosition write SetPosition default ipCenter;
+    property Position: TGDIAlign read FPosition write SetPosition default gaCenter;
   end;
 
 implementation
@@ -85,19 +76,13 @@ begin
   FPadding := 0;
   FHeight := 0;
   FWidth := 0;
-  FPosition := ipCenter;
+  FPosition := gaCenter;
 end;
 
 destructor TGDIImage.Destroy;
 begin
   FPicture.Free;
   inherited;
-end;
-
-procedure TGDIImage.DoChange;
-begin
-  if Assigned(FOnChange) then
-    OnChange(Self);
 end;
 
 procedure TGDIImage.Draw(AGPGraphics: IGPGraphics);
@@ -156,22 +141,22 @@ begin
     W := FControl.Width div 3;
 
   case FPosition of
-    ipTop:
+    gaTop:
       AGPGraphics.DrawImage(AImage, (FControl.Width div 2) - (W div 2), FPadding, W, H);
-    ipTopLeft:
+    gaTopLeft:
       AGPGraphics.DrawImage(AImage, FPadding, FPadding, W, H);
-    ipTopRight:
+    gaTopRight:
       AGPGraphics.DrawImage(AImage, FControl.Width - W - FPadding, FPadding, W, H);
 
-    ipCenterLeft:
+    gaCenterLeft:
       AGPGraphics.DrawImage(AImage, FPadding, (FControl.Width div 2) - (W div 2), W, H);
-    ipCenterRight:
+    gaCenterRight:
       AGPGraphics.DrawImage(AImage, FControl.Width - W - FPadding, (FControl.Height div 2) - (H div 2), W, H);
-    ipBotton:
+    gaBotton:
       AGPGraphics.DrawImage(AImage, (FControl.Width div 2) - (W div 2), FControl.Height - H - FPadding, W, H);
-    ipBottonLeft:
+    gaBottonLeft:
       AGPGraphics.DrawImage(AImage, FPadding, FControl.Height - H - FPadding, W, H);
-    ipBottonRight:
+    gaBottonRight:
       AGPGraphics.DrawImage(AImage, FControl.Width - W - FPadding, FControl.Height - H - FPadding, W, H);
   else
     AGPGraphics.DrawImage(AImage, (FControl.Width div 2) - (W div 2), (FControl.Height div 2) - (H div 2), W, H);
@@ -194,7 +179,7 @@ begin
   if FHeight <> Value then
   begin
     FHeight := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -203,7 +188,7 @@ begin
   if FInterpolation <> Value then
   begin
     FInterpolation := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -212,22 +197,22 @@ begin
   if FPadding <> Value then
   begin
     FPadding := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
 procedure TGDIImage.SetPicture(const Value: TPicture);
 begin
   FPicture.Assign(Value);
-  DoChange;
+  DoChange(Self);
 end;
 
-procedure TGDIImage.SetPosition(const Value: TImagePosition);
+procedure TGDIImage.SetPosition(const Value: TGDIAlign);
 begin
   if FPosition <> Value then
   begin
     FPosition := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -236,7 +221,7 @@ begin
   if FWidth <> Value then
   begin
     FWidth := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 

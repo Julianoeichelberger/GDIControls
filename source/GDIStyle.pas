@@ -6,10 +6,9 @@ uses
   Classes, Graphics, GDI, GDICtrls;
 
 type
-  TGDIStyle = class(TPersistent)
+  TGDIStyle = class(TGDIPersistent)
   private
     FControl: TCustomCtrl;
-    FOnChange: TNotifyEvent;
     FColorEnd: TColor;
     FGradientMode: TGPLinearGradientMode;
     FColorBegin: TColor;
@@ -18,20 +17,18 @@ type
     procedure SetColorBegin(const Value: TColor);
     procedure SetColorEnd(const Value: TColor);
     procedure SetGradientMode(const Value: TGPLinearGradientMode);
-    procedure DoChange;
     procedure SetOpacity(const Value: Word);
-
+    procedure SetAngle(const Value: Word);
+  private
     function GPColorBegin: TGPColor;
     function GPColorEnd: TGPColor;
-    procedure SetAngle(const Value: Word);
+    function GradientBrush: IGPLinearGradientBrush;
   public
     constructor Create(AControl: TCustomCtrl);
     destructor Destroy; override;
 
-    function GradientBrush: IGPLinearGradientBrush;
-
+    procedure Draw(GPGraphics: IGPGraphics); override;
     procedure Assign(Source: TPersistent); override;
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   published
     property Angle: Word read FAngle write SetAngle default 10;
     property ColorBegin: TColor read FColorBegin write SetColorBegin default clGray;
@@ -52,6 +49,7 @@ begin
     Self.FGradientMode := TGDIStyle(Source).GradientMode;
     Self.FColorBegin := TGDIStyle(Source).ColorBegin;
     Self.FOpacity := TGDIStyle(Source).Opacity;
+    Self.FAngle := TGDIStyle(Source).Angle;
   end
   else
     inherited;
@@ -72,10 +70,22 @@ begin
   inherited;
 end;
 
-procedure TGDIStyle.DoChange;
+procedure TGDIStyle.Draw(GPGraphics: IGPGraphics);
+var
+  GPGraphicsPath: IGPGraphicsPath;
 begin
-  if Assigned(FOnChange) then
-    OnChange(Self);
+  GPGraphicsPath := TGPGraphicsPath.Create;
+  GPGraphicsPath.Reset;
+
+  GPGraphicsPath.AddArc(3, 3, FAngle, FAngle, 180, 90);
+  GPGraphicsPath.AddArc(FControl.ClientWidth - FAngle - 4, 3, FAngle, FAngle, 270, 90);
+  GPGraphicsPath.AddArc(FControl.ClientWidth - FAngle - 4, FControl.ClientHeight - FAngle - 4, FAngle, FAngle, 0, 90);
+  GPGraphicsPath.AddArc(3, FControl.ClientHeight - FAngle - 4, FAngle, FAngle, 90, 90);
+  GPGraphicsPath.CloseFigure;
+
+  GPGraphics.SmoothingMode := SmoothingModeAntiAlias;
+  GPGraphics.TextRenderingHint := TextRenderingHintClearTypeGridFit;
+  GPGraphics.FillPath(GradientBrush, GPGraphicsPath);
 end;
 
 function TGDIStyle.GPColorBegin: TGPColor;
@@ -101,7 +111,7 @@ begin
   if FAngle <> Value then
   begin
     FAngle := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -110,7 +120,7 @@ begin
   if FColorBegin <> Value then
   begin
     FColorBegin := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -119,7 +129,7 @@ begin
   if FColorEnd <> Value then
   begin
     FColorEnd := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -128,7 +138,7 @@ begin
   if FGradientMode <> Value then
   begin
     FGradientMode := Value;
-    DoChange;
+    DoChange(Self);
   end;
 end;
 
@@ -137,7 +147,7 @@ begin
   if (FOpacity <> Value) and (Value in [0 .. 255]) then
   begin
     FOpacity := Value;
-    DoChange;
+    DoChange(Self);
   end;
 
 end;
