@@ -256,10 +256,10 @@ begin
     GPGraphics := TGPGraphics.Create(FCache);
 
     FStyle.Draw(GPGraphics);
-    FImage.Draw(GPGraphics);
     FBadges.Draw(GPGraphics);
     FTextBox.Draw(GPGraphics);
     FTexts.Draw(GPGraphics);
+    FImage.Draw(GPGraphics);
 
     FValidCache := True;
   end;

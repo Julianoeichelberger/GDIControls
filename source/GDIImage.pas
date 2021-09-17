@@ -3,11 +3,10 @@ unit GDIImage;
 interface
 
 uses
-  Graphics, Classes, Winapi.ActiveX,
-  GDI, GDICtrls, GDIUtils;
+  Graphics, Classes, Winapi.ActiveX, GDI, GDICtrls, GDIUtils;
 
 type
-  TDrawMode = (dmStretch, dmSquare);
+  TDrawMode = (dmStretch, dmSquare, dmRotate);
 
   TInterpolationMode = (imDefault, imLowQuality, imHighQuality, imBilinear,
     imBicubic, imNearestNeighbor, imHighQualityBilinear, imHighQualityBicubic);
@@ -30,8 +29,9 @@ type
     procedure SetWidth(const Value: Integer);
     procedure SetPosition(const Value: TGDIAlign);
   protected
-    procedure DrawStretchImage(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
-    procedure DrawSquareImage(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
+    procedure DrawStretch(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
+    procedure DrawSquare(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
+    procedure DrawRotate(AImage: IGPImage; AGPGraphics: IGPGraphics); virtual;
   public
     constructor Create(AControl: TCustomCtrl);
     destructor Destroy; override;
@@ -62,6 +62,10 @@ begin
   begin
     Self.FInterpolation := TGDIImage(Source).Interpolation;
     Self.FDrawMode := TGDIImage(Source).DrawMode;
+    Self.FPadding := TGDIImage(Source).Padding;
+    Self.FWidth := TGDIImage(Source).Width;
+    Self.FHeight := TGDIImage(Source).Height;
+    Self.FPosition := TGDIImage(Source).Position;
   end
   else
     inherited;
@@ -115,9 +119,11 @@ begin
         AGPGraphics.InterpolationMode := TGPInterpolationMode(Ord(FInterpolation));
         case FDrawMode of
           dmStretch:
-            DrawStretchImage(TGPImage.FromStream(Pstm), AGPGraphics);
+            DrawStretch(TGPImage.FromStream(Pstm), AGPGraphics);
           dmSquare:
-            DrawSquareImage(TGPImage.FromStream(Pstm), AGPGraphics);
+            DrawSquare(TGPImage.FromStream(Pstm), AGPGraphics);
+          dmRotate:
+            DrawRotate(TGPImage.FromStream(Pstm), AGPGraphics);
         end;
       end;
       Pstm := nil;
@@ -129,7 +135,7 @@ begin
   end;
 end;
 
-procedure TGDIImage.DrawSquareImage(AImage: IGPImage; AGPGraphics: IGPGraphics);
+procedure TGDIImage.DrawSquare(AImage: IGPImage; AGPGraphics: IGPGraphics);
 var
   H, W: Integer;
 begin
@@ -163,9 +169,29 @@ begin
   end;
 end;
 
-procedure TGDIImage.DrawStretchImage(AImage: IGPImage; AGPGraphics: IGPGraphics);
+procedure TGDIImage.DrawStretch(AImage: IGPImage; AGPGraphics: IGPGraphics);
 begin
   AGPGraphics.DrawImage(AImage, FPadding, FPadding, FControl.Width - FPadding * 2, FControl.Height - FPadding * 2);
+end;
+
+procedure TGDIImage.DrawRotate(AImage: IGPImage; AGPGraphics: IGPGraphics);
+const
+  DEGS = 330;
+var
+  Matrix: IGPMatrix;
+  Img_H, Img_W: Integer;
+begin
+  Img_H := FHeight;
+  if Img_H = 0 then
+    Img_H := FControl.Height div 2;
+  Img_W := FWidth;
+  if Img_W = 0 then
+    Img_W := FControl.Width div 2;
+
+  Matrix := TGPMatrix.Create;
+  Matrix.RotateAt(DEGS, TGPPointF.Create(0.5 * Img_W, 0.5 * Img_H));
+  AGPGraphics.SetTransform(Matrix);
+  AGPGraphics.DrawImage(AImage, FControl.Width div 5, FControl.Height - (FControl.Height div 5), Img_W, Img_H);
 end;
 
 procedure TGDIImage.SetDrawMode(const Value: TDrawMode);
