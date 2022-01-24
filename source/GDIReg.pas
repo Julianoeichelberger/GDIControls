@@ -10,11 +10,11 @@ procedure Register;
 implementation
 
 uses
-  GDICard;
+  GDICard, GDIButton;
 
 procedure Register;
 begin
-  RegisterComponents('GDI+ Controls', [TGDICard]);
+  RegisterComponents('GDI+ Controls', [TGDICard, TGDIButton]);
 end;
 
 end.

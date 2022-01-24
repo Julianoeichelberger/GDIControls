@@ -8,9 +8,7 @@ uses
 
 type
   TBadgeAlign = (
-    baTopLeft, baTopMiddle, baTopRight,
-    baCenterLeft, baCenterMiddle, baCenterRight,
-    baBottonLeft, baBottonMiddle, baBottonRight);
+    baTopLeft, baTopMiddle, baTopRight, baCenterLeft, baCenterMiddle, baCenterRight, baBottonLeft, baBottonMiddle, baBottonRight);
 
   TBadgeTextAlign = (btaInside, btaAbove, btaBellow, btaLeft, btaRight);
 

@@ -41,6 +41,7 @@ contains
   GDIStyle in 'source\GDIStyle.pas',
   GDIImage in 'source\GDIImage.pas',
   GDIText in 'source\GDIText.pas',
-  GDITextBox in 'source\GDITextBox.pas';
+  GDITextBox in 'source\GDITextBox.pas',
+  GDIButton in 'source\GDIButton.pas';
 
 end.
