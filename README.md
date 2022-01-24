@@ -2,4 +2,6 @@
 
 Vcl components created over the GDI +.
 
-In construction...
+Components availables:
+* TGDICard
+* TGDIButton
